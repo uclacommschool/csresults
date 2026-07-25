@@ -1,0 +1,335 @@
+---
+title: "SDUSD Teacher Retention & CBS Strategy Report"
+subtitle: "Retention Rate, Shifting Rate & Community-Based School (CBS) Strategy Trends"
+date: today
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-depth: 3
+    theme: flatly
+    page-layout: full
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+<!--
+PROJ: Teacher Retention
+FILE: 05-retention-cbs-report.qmd
+AUTH: Jeffrey Yo
+INIT: 7/13/26
+
+Goal: Pull together everything produced by 03-plot-retention-cbs-trends.R
+(retention_cbs_plots.RData) and 04-correlation-analyses.R
+(correlation_analysis_plots.RData + 5 CSVs) into one shareable HTML
+report, organized as Overall / By Cohort / By School / Correlation
+Analysis. embed-resources renders a single self-contained .html file -
+safe to email or share without an accompanying assets folder.
+
+Requires the DT package (install.packages("DT")) in addition to the
+packages used by scripts 03/04.
+
+Render with: quarto render 05-retention-cbs-report.qmd
+-->
+
+```{r setup}
+library(tidyverse)
+library(janitor)
+library(scales)
+library(DT)
+
+data_dir<-file.path("C:/Users/jyo/Box/TR Data/SDUSD/original","data")
+output_dir<-file.path("C:/Users/jyo/Box/TR Data/SDUSD/original","output")
+
+#plot objects built by 03-plot-retention-cbs-trends.R and
+#04-correlation-analyses.R
+#load(file.path(data_dir, "retention_cbs_plots.RData"))
+
+source(file.path(".","03-plot-retention-cbs-trends.R"))
+load(file.path(data_dir, "correlation_analysis_plots.RData"))
+
+#the retention/shifting plots store a sec_axis() formula
+#(~ . * cbs_max) that references cbs_max from the ORIGINAL script's
+#environment - that environment isn't saved along with the plot, so the
+#lookup fails when the plot is printed in this fresh session unless we
+#redefine cbs_max here too (must match the value used in
+#03-plot-retention-cbs-trends.R)
+cbs_max<-3
+
+#numeric result tables written by 04-correlation-analyses.R
+corr_table<-read_csv(file.path(output_dir, "correlation_table.csv"), show_col_types = FALSE)
+cbs_stage_anova_results<-read_csv(file.path(output_dir, "cbs_stage_anova_results.csv"), show_col_types = FALSE)
+cbs_stage_group_summary<-read_csv(file.path(output_dir, "cbs_stage_group_summary.csv"), show_col_types = FALSE)
+cohort_anova_results<-read_csv(file.path(output_dir, "cohort_anova_results.csv"), show_col_types = FALSE)
+cohort_group_summary<-read_csv(file.path(output_dir, "cohort_group_summary.csv"), show_col_types = FALSE)
+lagged_results<-read_csv(file.path(output_dir, "lagged_correlation_results.csv"), show_col_types = FALSE)
+
+#renders a data frame as a sortable/filterable table
+dt_table<-function(df) {
+  datatable(df, rownames = FALSE, filter = "top",
+           options = list(pageLength = 10, scrollX = TRUE))
+}
+```
+
+```{r lookups}
+#the .RData plot lists are keyed by janitor::make_clean_names() slugs
+#(e.g. "baker_elementary"), not the original display names - re-derive
+#the slug -> display-name mapping the same way 03-plot-retention-cbs-
+#trends.R does (same Marshall Elementary A/B fix), so tab and dropdown
+#labels show the real school/cohort names
+
+raw<-read_csv(file.path(data_dir, "school_retention_apr_long_2020_2024.csv"), show_col_types = FALSE) %>%
+  clean_names()
+
+raw<-raw %>%
+  arrange(school_name, academic_year) %>%
+  group_by(school_name, academic_year) %>%
+  mutate(row_in_group = row_number()) %>%
+  ungroup() %>%
+  mutate(school_name = if_else(school_name == "Marshall Elementary",
+                               paste("Marshall Elementary", if_else(row_in_group == 1, "A", "B")),
+                               school_name)) %>%
+  select(-row_in_group)
+
+school_lookup<-tibble(school = sort(unique(raw$school_name))) %>%
+  mutate(slug = make_clean_names(school))
+
+ccspp_lookup<-tibble(cohort = sort(unique(raw$ccspp_cohort[!is.na(raw$ccspp_cohort)]))) %>%
+  mutate(slug = make_clean_names(cohort))
+
+sdusd_lookup<-tibble(cohort = sort(unique(raw$sdusd_cohort[!is.na(raw$sdusd_cohort)]))) %>%
+  mutate(slug = make_clean_names(cohort))
+```
+
+This report summarizes teacher retention rate, teacher shifting rate, and Community-Based School (CBS) strategy scores for `r nrow(school_lookup)` schools across the 2020-21 through 2024-25 academic years. Use the **Overall**, **By Cohort**, and **By School** sections below to explore the trend plots, and the **Correlation Analysis** section for how retention/shifting relate to CBS strategies and other APR variables.
+
+## Overall
+
+::: {.panel-tabset}
+
+### Retention Rate
+
+```{r}
+overall_plots$retention_rate
+```
+
+### Shifting Rate
+
+```{r}
+overall_plots$shifting_rate
+```
+
+### Combined
+
+```{r}
+overall_plots$combined
+```
+
+:::
+
+## By Cohort
+
+### CCSPP Cohort
+
+```{r}
+#| output: asis
+for (i in seq_len(nrow(ccspp_lookup))) {
+
+  coh<-ccspp_lookup$cohort[i]
+  slug<-ccspp_lookup$slug[i]
+
+  cat("#### ", coh, "\n\n")
+  cat("::: {.panel-tabset}\n\n")
+
+  cat("##### Retention Rate\n\n")
+  print(ccspp_cohort_plots$retention_rate[[slug]])
+
+  cat("\n\n##### Shifting Rate\n\n")
+  print(ccspp_cohort_plots$shifting_rate[[slug]])
+
+  cat("\n\n##### Combined\n\n")
+  print(ccspp_cohort_plots$combined[[slug]])
+
+  cat("\n\n:::\n\n")
+}
+```
+
+### SDUSD Cohort
+
+```{r}
+#| output: asis
+for (i in seq_len(nrow(sdusd_lookup))) {
+
+  coh<-sdusd_lookup$cohort[i]
+  slug<-sdusd_lookup$slug[i]
+
+  cat("#### ", coh, "\n\n")
+  cat("::: {.panel-tabset}\n\n")
+
+  cat("##### Retention Rate\n\n")
+  print(sdusd_cohort_plots$retention_rate[[slug]])
+
+  cat("\n\n##### Shifting Rate\n\n")
+  print(sdusd_cohort_plots$shifting_rate[[slug]])
+
+  cat("\n\n##### Combined\n\n")
+  print(sdusd_cohort_plots$combined[[slug]])
+
+  cat("\n\n:::\n\n")
+}
+```
+
+## By School
+
+Pick a school from the dropdown to see its retention/shifting/combined trend plots.
+
+```{=html}
+<style>
+.school-panel { display: none; }
+.school-panel.active { display: block; }
+.school-selector-wrapper { margin: 1em 0 1.5em 0; }
+#school-select { font-size: 1rem; padding: 0.35em; min-width: 260px; }
+</style>
+<script>
+function showSchoolPanel(slug) {
+  var panels = document.getElementsByClassName('school-panel');
+  for (var i = 0; i < panels.length; i++) {
+    panels[i].classList.remove('active');
+  }
+  var target = document.getElementById('school-panel-' + slug);
+  if (target) { target.classList.add('active'); }
+}
+</script>
+```
+
+```{r}
+#| output: asis
+cat('<div class="school-selector-wrapper">\n')
+cat('<label for="school-select"><strong>Select a school: </strong></label>\n')
+cat('<select id="school-select" onchange="showSchoolPanel(this.value)">\n')
+for (i in seq_len(nrow(school_lookup))) {
+  cat(sprintf('<option value="%s">%s</option>\n', school_lookup$slug[i], school_lookup$school[i]))
+}
+cat('</select>\n')
+cat('</div>\n\n')
+```
+
+```{r}
+#| output: asis
+for (i in seq_len(nrow(school_lookup))) {
+
+  sch<-school_lookup$school[i]
+  slug<-school_lookup$slug[i]
+  active_class<-if (i == 1) " active" else ""
+
+  cat(sprintf('<div id="school-panel-%s" class="school-panel%s">\n\n', slug, active_class))
+
+  cat("#### ", sch, "\n\n")
+  cat("::: {.panel-tabset}\n\n")
+
+  cat("##### Retention Rate\n\n")
+  print(school_plots$retention_rate[[slug]])
+
+  cat("\n\n##### Shifting Rate\n\n")
+  print(school_plots$shifting_rate[[slug]])
+
+  cat("\n\n##### Combined\n\n")
+  print(school_plots$combined[[slug]])
+
+  cat("\n\n:::\n\n")
+  cat('</div>\n\n')
+}
+```
+
+## Correlation Analysis
+
+How retention rate relates to the 5 CBS strategy scores and other numeric APR/participation variables. See `04-correlation-analyses.R` for the underlying methodology. Shifting rate was dropped from this analysis (near-zero variation across schools made it uninformative to correlate against).
+
+### Correlation Matrix
+
+```{r}
+corr_heatmap
+```
+
+Significant cells (p < 0.05) are starred.
+
+**Full correlation table** (Pearson and Spearman, every predictor x outcome):
+
+```{r}
+dt_table(corr_table)
+```
+
+### Scatterplots
+
+One panel per CBS strategy score (plus teacher leadership development support), with a linear trend line. Each panel is labeled with its Pearson r, starred when p < 0.05.
+
+```{r}
+#| fig-height: 11
+scatter_plots$retention_rate
+```
+
+### CBS Maturity Stage Comparison (ANOVA)
+
+Retention rate compared across the 3 CBS maturity stages (1 - Visioning, 2 - Engaging, 3 - Transforming) for each CBS strategy, via one-way ANOVA.
+
+```{r}
+cbs_stage_boxplots$retention_rate
+```
+
+**ANOVA results** (retention rate ~ stage, per CBS strategy):
+
+```{r}
+dt_table(cbs_stage_anova_results)
+```
+
+**Group means by stage:**
+
+```{r}
+dt_table(cbs_stage_group_summary)
+```
+
+### Cohort Comparisons (ANOVA)
+
+::: {.panel-tabset}
+
+#### CCSPP Cohort
+
+```{r}
+cohort_plots$ccspp_cohort$retention_rate
+```
+
+#### SDUSD Cohort
+
+```{r}
+cohort_plots$sdusd_cohort$retention_rate
+```
+
+:::
+
+**ANOVA results:**
+
+```{r}
+dt_table(cohort_anova_results)
+```
+
+**Group means by cohort:**
+
+```{r}
+dt_table(cohort_group_summary)
+```
+
+### Lagged Correlation
+
+Spearman correlation of this year's CBS score against the *same*-year retention rate ("lag 0") vs. *next*-year retention rate ("lag 1"), within school.
+
+```{r}
+lagged_plots$retention_rate
+```
+
+**Lagged correlation results:**
+
+```{r}
+dt_table(lagged_results)
+```
