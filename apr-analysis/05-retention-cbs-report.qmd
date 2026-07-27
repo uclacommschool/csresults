@@ -1,6 +1,6 @@
 ---
 title: "SDUSD Teacher Retention & CBS Strategy Report"
-subtitle: "Retention Rate, Shifting Rate & Community-Based School (CBS) Strategy Trends"
+subtitle: "Retention Rate, Shifting Rate & Capacity-Building  Strategies (CBS) Trends"
 date: today
 format:
   html:
@@ -103,7 +103,7 @@ sdusd_lookup<-tibble(cohort = sort(unique(raw$sdusd_cohort[!is.na(raw$sdusd_coho
   mutate(slug = make_clean_names(cohort))
 ```
 
-This report summarizes teacher retention rate, teacher shifting rate, and Community-Based School (CBS) strategy scores for `r nrow(school_lookup)` schools across the 2020-21 through 2024-25 academic years. Use the **Overall**, **By Cohort**, and **By School** sections below to explore the trend plots, and the **Correlation Analysis** section for how retention/shifting relate to CBS strategies and other APR variables.
+This report summarizes teacher retention rate, teacher shifting rate, and Capacity-Building  Strategies (CBS) scores for `r nrow(school_lookup)` schools across the 2020-21 through 2024-25 academic years. Use the **Overall**, **By Cohort**, and **By School** sections below to explore the trend plots, and the **Correlation Analysis** section for how retention/shifting relate to CBS strategies and other APR variables.
 
 ## Overall
 
